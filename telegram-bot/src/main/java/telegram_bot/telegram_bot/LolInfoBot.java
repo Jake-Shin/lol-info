@@ -2,8 +2,15 @@ package telegram_bot.telegram_bot;
 
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
@@ -16,12 +23,41 @@ import net.rithms.riot.constant.Platform;
 
 public class LolInfoBot extends TelegramLongPollingBot{
 
-	File path = new File(LolInfoBot.class.getResource("../../staticdata/champion.json").getFile());
 	JSONParser parser = new JSONParser();
 	
 	public void onUpdateReceived(Update update) {
 		ApiConfig config = new ApiConfig().setKey("RGAPI-3ae52187-b85e-4788-b0b4-11b60206ee9c");
 		RiotApi api = new RiotApi(config);
+		
+		//test
+		try {
+			Object obj = parser.parse(new FileReader("../staticdata/data/ko_KR/champion.json"));
+			JSONObject jsonObject = (JSONObject) obj;
+			
+			Map<String, Object> map = new HashMap<String, Object>();
+			JSONObject jsonObj = (JSONObject) jsonObject.get("data");
+			
+			Iterator<String> keysItr = jsonObj.keySet().iterator();
+			while (keysItr.hasNext()) {
+				String key = keysItr.next();
+				Object value = jsonObj.get(key);
+				
+				System.out.println(key + " : " + value);
+				
+				if (value instanceof JSONArray) {
+					System.out.println("json array");
+				} else if (value instanceof JSONObject) {
+					System.out.println("json object");
+				}
+				
+				map.put(key, value);
+			}
+		} catch (IOException | ParseException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+			System.out.println("------------------------------------------------------");
+		}
+		//test
 
 		Summoner summoner = null;
 		try {
@@ -36,7 +72,6 @@ public class LolInfoBot extends TelegramLongPollingBot{
 		System.out.println("Summoner Level: " + summoner.getSummonerLevel());
 		System.out.println("Profile Icon ID: " + summoner.getProfileIconId());
 		
-		Object obj = parser.parse(new FileReader(LolInfoBot.class.getResource("../../staticdata/champion.json")));
 	}
 
 	public String getBotUsername() {
