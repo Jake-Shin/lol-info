@@ -6,43 +6,68 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
+import java.util.logging.Level;
 
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.ParseMode;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
-
+import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import net.rithms.riot.api.ApiConfig;
 import net.rithms.riot.api.RiotApi;
+import net.rithms.riot.api.RiotApiAsync;
 import net.rithms.riot.api.RiotApiException;
+import net.rithms.riot.api.endpoints.league.constant.LeagueQueue;
+import net.rithms.riot.api.endpoints.league.dto.LeaguePosition;
 import net.rithms.riot.api.endpoints.summoner.dto.Summoner;
+import net.rithms.riot.api.request.AsyncRequest;
+import net.rithms.riot.api.request.RequestAdapter;
 import net.rithms.riot.constant.Platform;
 
 public class LolInfoBot extends TelegramLongPollingBot{
 
 	JSONParser parser = new JSONParser();
 	
+	// Inner class to store information in
+	private class ExtendedSummoner {
+		public Summoner summoner;
+		public LeaguePosition leagueSolo;
+		public LeaguePosition leagueFlexSR;
+		public LeaguePosition leagueFlexTT;
+	}
+	
 	public void onUpdateReceived(Update update) {
 		ApiConfig config = new ApiConfig().setKey("RGAPI-3ae52187-b85e-4788-b0b4-11b60206ee9c");
 		RiotApi api = new RiotApi(config);
+		RiotApiAsync apiAsync = api.getAsyncApi();
+		
+		final ExtendedSummoner eSummoner = new ExtendedSummoner(); // Object where we want to store the data
+		
+		String sInputText = update.getMessage().getText();
 		
 		//test
-		try {
-			Object obj = parser.parse(new FileReader("../staticdata/data/ko_KR/champion.json"));
+		/*try {
+			Object obj = parser.parse(new FileReader(System.getProperty("user.dir") + "/src/main/java/telegram_bot/staticdata/data/ko_KR/champion.json"));
+			System.out.println("-==-=-=-=-=-=-=-=-=-=-=-==-=-=-=-=-=-");
+			System.out.println(System.getProperty("user.dir"));
 			JSONObject jsonObject = (JSONObject) obj;
 			
 			Map<String, Object> map = new HashMap<String, Object>();
 			JSONObject jsonObj = (JSONObject) jsonObject.get("data");
-			
 			Iterator<String> keysItr = jsonObj.keySet().iterator();
 			while (keysItr.hasNext()) {
 				String key = keysItr.next();
 				Object value = jsonObj.get(key);
 				
-				System.out.println(key + " : " + value);
+				if ("Aatrox".equals(key)) {
+					System.out.println(key + " :=> " + value);
+				}
 				
 				if (value instanceof JSONArray) {
 					System.out.println("json array");
@@ -50,28 +75,118 @@ public class LolInfoBot extends TelegramLongPollingBot{
 					System.out.println("json object");
 				}
 				
-				map.put(key, value);
+				//map.put(key, value);
 			}
-		} catch (IOException | ParseException e1) {
+		} catch (Exception e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 			System.out.println("------------------------------------------------------");
-		}
+		}*/
 		//test
-
-		Summoner summoner = null;
-		try {
-			summoner = api.getSummonerByName(Platform.KR, "핀구");
-		} catch (RiotApiException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		System.out.println("Name: " + summoner.getName());
-		System.out.println("Summoner ID: " + summoner.getId());
-		System.out.println("Account ID: " + summoner.getAccountId());
-		System.out.println("Summoner Level: " + summoner.getSummonerLevel());
-		System.out.println("Profile Icon ID: " + summoner.getProfileIconId());
 		
+		if (sInputText.contains("/info")) {
+			// Asynchronously get summoner information
+			Summoner summoner = null;
+			String sText = sInputText.replaceFirst("/info", "").trim();
+			try {
+				summoner = api.getSummonerByName(Platform.KR, sText);
+				SendMessage msg = new SendMessage().setParseMode(ParseMode.HTML);
+				msg.setChatId(update.getMessage().getChatId());
+				
+				AsyncRequest requestSummoner = apiAsync.getSummoner(Platform.KR, summoner.getId());
+				requestSummoner.addListeners(new RequestAdapter() {
+					@Override
+					public void onRequestSucceeded(AsyncRequest request) {
+						eSummoner.summoner = request.getDto();
+					}
+				});
+				
+				// Asynchronously get league information
+				AsyncRequest requestLeague = apiAsync.getLeaguePositionsBySummonerId(Platform.KR, summoner.getId());
+				requestLeague.addListeners(new RequestAdapter() {
+					@Override
+					public void onRequestSucceeded(AsyncRequest request) {
+						Set<LeaguePosition> leaguePositions = request.getDto();
+						if (leaguePositions == null || leaguePositions.isEmpty()) {
+							return;
+						}
+						for (LeaguePosition leaguePosition : leaguePositions) {
+							if (leaguePosition.getQueueType().equals(LeagueQueue.RANKED_SOLO_5x5.name())) {
+								eSummoner.leagueSolo = leaguePosition;
+							} else if (leaguePosition.getQueueType().equals(LeagueQueue.RANKED_FLEX_SR.name())) {
+								eSummoner.leagueFlexSR = leaguePosition;
+							} else if (leaguePosition.getQueueType().equals(LeagueQueue.RANKED_FLEX_TT.name())) {
+								eSummoner.leagueFlexTT = leaguePosition;
+							}
+						}
+					}
+				});
+				
+				try {
+					// Wait for all asynchronous requests to finish
+					apiAsync.awaitAll();
+				} catch (InterruptedException e) {
+					// We can use the Api's logger
+					RiotApi.log.log(Level.SEVERE, "Waiting Interrupted", e);
+				}
+				
+				// Print information stored in eSummoner
+				System.out.println("Summoner name: " + eSummoner.summoner.getName());
+				String sSoloInfoText = "";
+				String sFlexSRInfoText = "";
+				String sFlexTTInfoText = "";
+				
+				System.out.print("Solo Rank: ");
+				if (eSummoner.leagueSolo == null) {
+					System.out.println("unranked");
+				} else {
+					System.out.println(eSummoner.leagueSolo.getTier() + " " + eSummoner.leagueSolo.getRank());
+					sSoloInfoText = "<b>Solo Rank</b>" + "\n"
+									+ "  <b>Tier</b> : " + eSummoner.leagueSolo.getTier() + " " + eSummoner.leagueSolo.getRank() + "\n"
+									+ "  <b>Wins</b> : " + eSummoner.leagueSolo.getWins() + "\n"
+									+ "  <b>Defeats</b> : " + eSummoner.leagueSolo.getLosses() + "\n"
+									+ "  <b>League points</b> : " + eSummoner.leagueSolo.getLeaguePoints();
+				}
+
+				System.out.print("Flex SR Rank: ");
+				if (eSummoner.leagueFlexSR == null) {
+					System.out.println("unranked");
+				} else {
+					System.out.println(eSummoner.leagueFlexSR.getTier() + " " + eSummoner.leagueFlexSR.getRank());
+					sFlexSRInfoText = "<b>Flex Rank</b>" + "\n"
+							+ "  <b>Tier</b> : " + eSummoner.leagueFlexSR.getTier() + " " + eSummoner.leagueFlexSR.getRank() + "\n"
+							+ "  <b>Wins</b> : " + eSummoner.leagueFlexSR.getWins() + "\n"
+							+ "  <b>Defeats</b> : " + eSummoner.leagueFlexSR.getLosses() + "\n"
+							+ "  <b>League points</b> : " + eSummoner.leagueFlexSR.getLeaguePoints();
+				}
+
+				/*System.out.print("Flex TT Rank: ");
+				if (eSummoner.leagueFlexTT == null) {
+					System.out.println("unranked");
+				} else {
+					System.out.println(eSummoner.leagueFlexTT.getTier() + " " + eSummoner.leagueFlexTT.getRank());
+					sFlexTTInfoText = "<b>뒤틀린숲</b>" + "\n"
+							+ "  <b>Tier</b> : " + eSummoner.leagueFlexTT.getTier() + " " + eSummoner.leagueFlexTT.getRank() + "\n"
+							+ "  <b>Wins</b> : " + eSummoner.leagueFlexTT.getWins() + "\n"
+							+ "  <b>Defeats</b> : " + eSummoner.leagueFlexTT.getLosses() + "\n"
+							+ "  <b>League points</b> : " + eSummoner.leagueFlexTT.getLeaguePoints();
+				}*/
+				
+				msg.setText("<b>Name</b> : " + summoner.getName() + "\n"
+					     + "<b>Summoner Level</b> : <i>" + summoner.getSummonerLevel() + "</i>"
+					     + "\n\n"
+					     + sSoloInfoText
+					     + "\n\n"
+					     + sFlexSRInfoText);
+				execute(msg);
+			} catch (RiotApiException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (TelegramApiException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 	}
 
 	public String getBotUsername() {
