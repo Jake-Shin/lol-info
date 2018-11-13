@@ -16,6 +16,8 @@ import org.json.simple.parser.ParseException;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.ParseMode;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.PhotoSize;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
@@ -90,7 +92,7 @@ public class LolInfoBot extends TelegramLongPollingBot{
 			String sText = sInputText.replaceFirst("/info", "").trim();
 			try {
 				summoner = api.getSummonerByName(Platform.KR, sText);
-				SendMessage msg = new SendMessage().setParseMode(ParseMode.HTML);
+				SendMessage msg = new SendMessage().setParseMode(ParseMode.HTML).disableWebPagePreview();
 				msg.setChatId(update.getMessage().getChatId());
 				
 				AsyncRequest requestSummoner = apiAsync.getSummoner(Platform.KR, summoner.getId());
@@ -141,10 +143,11 @@ public class LolInfoBot extends TelegramLongPollingBot{
 					System.out.println("unranked");
 				} else {
 					System.out.println(eSummoner.leagueSolo.getTier() + " " + eSummoner.leagueSolo.getRank());
+					double iPOV = (((float)eSummoner.leagueSolo.getWins()) / ((float)eSummoner.leagueSolo.getWins() + (float)eSummoner.leagueSolo.getLosses())) * 100;
 					sSoloInfoText = "<b>Solo Rank</b>" + "\n"
 									+ "  <b>Tier</b> : " + eSummoner.leagueSolo.getTier() + " " + eSummoner.leagueSolo.getRank() + "\n"
 									+ "  <b>Wins</b> : " + eSummoner.leagueSolo.getWins() + "\n"
-									+ "  <b>Defeats</b> : " + eSummoner.leagueSolo.getLosses() + "\n"
+									+ "  <b>Defeats</b> : " + eSummoner.leagueSolo.getLosses() + " <b>POV</b> : " + String.format("%.2f", iPOV) + "%\n"
 									+ "  <b>League points</b> : " + eSummoner.leagueSolo.getLeaguePoints();
 				}
 
@@ -153,10 +156,11 @@ public class LolInfoBot extends TelegramLongPollingBot{
 					System.out.println("unranked");
 				} else {
 					System.out.println(eSummoner.leagueFlexSR.getTier() + " " + eSummoner.leagueFlexSR.getRank());
+					double iPOV = (((float)eSummoner.leagueFlexSR.getWins()) / ((float)eSummoner.leagueFlexSR.getWins() + (float)eSummoner.leagueFlexSR.getLosses())) * 100;
 					sFlexSRInfoText = "<b>Flex Rank</b>" + "\n"
 							+ "  <b>Tier</b> : " + eSummoner.leagueFlexSR.getTier() + " " + eSummoner.leagueFlexSR.getRank() + "\n"
 							+ "  <b>Wins</b> : " + eSummoner.leagueFlexSR.getWins() + "\n"
-							+ "  <b>Defeats</b> : " + eSummoner.leagueFlexSR.getLosses() + "\n"
+							+ "  <b>Defeats</b> : " + eSummoner.leagueFlexSR.getLosses() + " <b>POV</b> : " + String.format("%.2f", iPOV) + "%\n"
 							+ "  <b>League points</b> : " + eSummoner.leagueFlexSR.getLeaguePoints();
 				}
 
@@ -172,19 +176,23 @@ public class LolInfoBot extends TelegramLongPollingBot{
 							+ "  <b>League points</b> : " + eSummoner.leagueFlexTT.getLeaguePoints();
 				}*/
 				
-				msg.setText("<b>Name</b> : " + summoner.getName() + "\n"
-					     + "<b>Summoner Level</b> : <i>" + summoner.getSummonerLevel() + "</i>"
+				msg.setText("<b>Name</b> : <a href='www.op.gg/summoner/userName= "+ summoner.getName() + "'>" + summoner.getName() + "</a>\n"
+					     + "<b>Level</b> : <i>" + summoner.getSummonerLevel() + "</i>"
 					     + "\n\n"
 					     + sSoloInfoText
 					     + "\n\n"
 					     + sFlexSRInfoText);
+				//sendImageUploadingAFile(System.getProperty("user.dir") + "/src/main/java/telegram_bot/staticdata/img/profileicon/" + summoner.getProfileIconId() + ".png", update.getMessage().getChatId().toString());
+				sendProFileImage("opgg-static.akamaized.net/images/profile_icons/profileIcon" + summoner.getProfileIconId() + ".jpg", update.getMessage().getChatId().toString());
 				execute(msg);
 			} catch (RiotApiException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+				System.out.println("1");
 			} catch (TelegramApiException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+				System.out.println("2");
 			}
 		}
 	}
@@ -199,5 +207,21 @@ public class LolInfoBot extends TelegramLongPollingBot{
 		// TODO Auto-generated method stub
 		return "687333359:AAHen9ZFe5bAQLbahX98QpuIvitXSDqL-iQ";
 	}
+	
+	
+	public void sendProFileImage(String url, String chatId) {
+        // Create send method
+        SendPhoto sendPhotoRequest = new SendPhoto();
+        // Set destination chat id
+        sendPhotoRequest.setChatId(chatId);
+        // Set the photo file as a new photo (You can also use InputStream with a method overload)
+        sendPhotoRequest.setPhoto(url);
+        try {
+            // Execute the method
+            execute(sendPhotoRequest);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
 
 }
