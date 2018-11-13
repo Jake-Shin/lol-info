@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -35,6 +36,8 @@ import net.rithms.riot.constant.Platform;
 public class LolInfoBot extends TelegramLongPollingBot{
 
 	JSONParser parser = new JSONParser();
+	String resourcePath = "/main/java/props/key.properties";
+	Properties props = new Properties();
 	
 	// Inner class to store information in
 	private class ExtendedSummoner {
@@ -45,7 +48,7 @@ public class LolInfoBot extends TelegramLongPollingBot{
 	}
 	
 	public void onUpdateReceived(Update update) {
-		ApiConfig config = new ApiConfig().setKey("API Key");
+		ApiConfig config = new ApiConfig().setKey(props.getProperty("RiotApiKey"));
 		RiotApi api = new RiotApi(config);
 		RiotApiAsync apiAsync = api.getAsyncApi();
 		
@@ -205,7 +208,7 @@ public class LolInfoBot extends TelegramLongPollingBot{
 	@Override
 	public String getBotToken() {
 		// TODO Auto-generated method stub
-		return "API Key";
+		return props.getProperty("TelegramApiKey");
 	}
 	
 	
