@@ -45,7 +45,7 @@ public class LolInfoBot extends TelegramLongPollingBot{
 	}
 	
 	public void onUpdateReceived(Update update) {
-		ApiConfig config = new ApiConfig().setKey("RGAPI-3ae52187-b85e-4788-b0b4-11b60206ee9c");
+		ApiConfig config = new ApiConfig().setKey("API Key");
 		RiotApi api = new RiotApi(config);
 		RiotApiAsync apiAsync = api.getAsyncApi();
 		
@@ -205,7 +205,7 @@ public class LolInfoBot extends TelegramLongPollingBot{
 	@Override
 	public String getBotToken() {
 		// TODO Auto-generated method stub
-		return "687333359:AAHen9ZFe5bAQLbahX98QpuIvitXSDqL-iQ";
+		return "API Key";
 	}
 	
 	
